@@ -7,26 +7,79 @@ const formBuscarPersona = document.getElementById("formBusarPersona");
 const resultContainer = document.getElementById("resultContainer");
 const resultItems = document.getElementById("resultItems");
 
-
 function clearResults() {
-  if (resultContainer) resultContainer.innerHTML = "";
+    if (resultContainer) resultContainer.innerHTML = "";
 }
 
+function cardItems(person = {}) {
+    if (!resultItems) return;
 
-function cardItems(){
-    
+    const elementosArr = Array.isArray(person.elementos)
+        ? person.elementos
+        : (person.elementos ? [person.elementos] : []);
+
+    if (elementosArr.length === 0) {
+        resultItems.innerHTML =
+            `<div class="alert alert-secondary">No hay items para esta persona.</div>`;
+        return;
+    }
+
+    let html = `<div class="container"><h1>Items del usuario</h1></div>`;
+
+    // agrega una tarjeta por cada elemento
+    elementosArr.forEach((elemento) => {
+        const codigo = elemento.codigo || "***";
+        const nombre = elemento.nombre || "***";
+        const caracteristicas = elemento.caracteristicas || "***";
+        const fotoUrl = elemento.foto;
+        const tipo = elemento.tipo.tipo;
+
+
+        //prueba
+        let estado = true
+        let botonEntradaSalida = ''
+
+        if(estado === false){
+           botonEntradaSalida =  '<button class="btn btn-success mb-3">Registrar Entrada</button>'
+        }else{
+            botonEntradaSalida = '<button class="btn btn-primary mb-3">Registrar Salida</button>'
+        }
+
+        html += `
+      <div class="card mb-3" style="max-width:540px">
+        <div class="card-body">
+          <h5 class="card-title mb-1">${nombre}</h5>
+          <p class="card-text mb-1"><small class="text-muted">Codigo: ${codigo}</small></p>
+          <p class="card-text mb-1">Caracteristicas: ${caracteristicas}</p>
+          <p class="card-text mb-1">Tipo: ${tipo}</p>
+          <p class="card-text mb-1">Estado: ${estado}</p>
+          <img src="${fotoUrl}" alt="${nombre}" class="img-fluid" style="width: 80px; height: 90px;">
+          <div>${botonEntradaSalida}</div>
+          <button class="btn btn-warning mb-3">Editar</button>
+          
+        </div>
+      </div>
+    `;
+    });
+
+    resultItems.innerHTML = html;
 }
 
 function renderCard(person = {}) {
-  if (!resultContainer) return;
-  const nombre = ((person.nombres || person.nombre) + " " + (person.apellidos || "")).trim() || "Sin nombre";
-  const documento = person.documento || person.numero_documento || "—";
-  const email = person.email || "—";
-  const telefono = person.telefono || "—";
+    if (!resultContainer) return;
+    const nombre =
+        ((person.nombres || person.nombre) + " " + (person.apellidos || ""))
+            .trim() || "Sin nombre";
+    const documento = person.documento || person.numero_documento || "—";
+    const email = person.email || "—";
+    const telefono = person.telefono || "—";
 
-  resultContainer.innerHTML = `
+    resultContainer.innerHTML = `
     <div class="card mb-3" style="max-width:540px">
       <div class="card-body">
+        <button class="btn btn-success mb-2" data-bs-toggle="modal" data-bs-target="#modalElemento" id="btn-nuevo">
+                Agregar elemento
+        </button>
         <h5 class="card-title mb-1">${nombre}</h5>
         <p class="card-text mb-1"><small class="text-muted">Documento: ${documento}</small></p>
         <p class="card-text mb-1">Email: ${email}</p>
@@ -37,42 +90,76 @@ function renderCard(person = {}) {
 }
 
 function showMessage(html) {
-  if (!resultContainer) return;
-  resultContainer.innerHTML = html;
+    if (!resultContainer) return;
+    resultContainer.innerHTML = html;
 }
 
+
+
+
 if (!formBuscarPersona) console.error("No se encontró #formBusarPersona");
-else formBuscarPersona.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  clearResults();
+else {
+    formBuscarPersona.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearResults();
 
-  const documento = documentoInput.value.trim();
-  if (!documento) return alert("Ingrese un documento");
-  if (!token) return alert("No hay token. Inicie sesión.");
+        const documento = documentoInput.value.trim();
+        if (!documento) return alert("Ingrese un documento");
+        if (!token) return alert("No hay token. Inicie sesión.");
 
-  try {
-    const res = await fetch(`${APIPERSONAS}personaDocumento/${encodeURIComponent(documento)}`, {
-      method: "GET",
-      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
+        try {
+            const res = await fetch(
+                `${APIPERSONAS}personaPorDocumento/${
+                    encodeURIComponent(documento)
+                }`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                },
+            );
+
+            if (!res.ok) {
+                const txt = await res.text();
+                return showMessage(
+                    `<div class="alert alert-warning">No se encontró la persona.</div>`,
+                );
+            }
+
+            const data = await res.json();
+            console.log(data);
+
+            const person = data.persona !== undefined ? data.persona : data;
+            console.log("person:", person);
+            if (!person) {
+                showMessage(
+                    `<div class="alert alert-warning">No se encontró la persona.</div>`,
+                );
+            } else {
+                renderCard(person);
+                cardItems(person);
+            }
+        } catch (err) {
+            console.error(err);
+            showMessage(
+                `<div class="alert alert-danger">Ocurrió un error. Revisa la consola.</div>`,
+            );
+        }
     });
+}
 
-    if (!res.ok) {
-      const txt = await res.text();
-      return showMessage(`<div class="alert alert-danger">Error ${res.status}: ${txt}</div>`);
-    }
 
-    const data = await res.json();
-    console.log(data)
+//Estado del prestamo
 
-    const person = data.persona !== undefined ? data.persona : data;
-    console.log("person:", person);
-    if (!person) {
-      showMessage(`<div class="alert alert-warning">No se encontró la persona.</div>`);
-    } else {
-      renderCard(person);
-    }
-  } catch (err) {
-    console.error(err);
-    showMessage(`<div class="alert alert-danger">Ocurrió un error. Revisa la consola.</div>`);
-  }
-});
+    let ingresoElementos = fetch(`${APIPERSONAS}ingresosElementos`,{
+        headers:{
+            Authorization:`Bearer ${token}`
+        }
+    })
+
+    .then(response => response.json())
+    .then(data => {
+        console.log(data)
+    })
