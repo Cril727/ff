@@ -1,0 +1,39 @@
+    <!-- Modal Crear/Editar -->
+    <div class="modal fade" id="modalElemento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">
+                        Nuevo elemento
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="idElemento">
+                    <div class="mb-3">
+                        <label class="form-label">Código</label>
+                        <input class="form-control" id="codigo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" id="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Características</label>
+                        <textarea class="form-control" id="caracteristicas" rows="2"></textarea>
+                    </div>
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardar">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
