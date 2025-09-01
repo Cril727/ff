@@ -34,16 +34,19 @@ function cardItems(person = {}) {
         const fotoUrl = elemento.foto;
         const tipo = elemento.tipo.tipo;
 
+        // extrae estado de forma segura
+        const estadoObj = elemento.ultimo_ingreso_elemento;
+        const estado = estadoObj ? estadoObj.estado : null;
 
-        //prueba
-        let estado = true
-        let botonEntradaSalida = ''
 
-        if(estado === false){
-           botonEntradaSalida =  '<button class="btn btn-success mb-3">Registrar Entrada</button>'
-        }else{
-            botonEntradaSalida = '<button class="btn btn-primary mb-3">Registrar Salida</button>'
+        if (estado === "activo") {
+            botonEntradaSalida =
+                '<button class="btn btn-primary mb-3">Registrar Salida</button>';
+        } else {
+            botonEntradaSalida =
+                '<button class="btn btn-success mb-3">Registrar Entrada</button>';
         }
+
 
         html += `
       <div class="card mb-3" style="max-width:540px">
@@ -65,6 +68,7 @@ function cardItems(person = {}) {
     resultItems.innerHTML = html;
 }
 
+
 function renderCard(person = {}) {
     if (!resultContainer) return;
     const nombre =
@@ -77,13 +81,16 @@ function renderCard(person = {}) {
     resultContainer.innerHTML = `
     <div class="card mb-3" style="max-width:540px">
       <div class="card-body">
-        <button class="btn btn-success mb-2" data-bs-toggle="modal" data-bs-target="#modalElemento" id="btn-nuevo">
-                Agregar elemento
-        </button>
         <h5 class="card-title mb-1">${nombre}</h5>
         <p class="card-text mb-1"><small class="text-muted">Documento: ${documento}</small></p>
         <p class="card-text mb-1">Email: ${email}</p>
         <p class="card-text">Tel: ${telefono}</p>
+        <button class="btn btn-success mb-2" data-bs-toggle="modal" data-bs-target="#modalElemento" id="btn-nuevo">
+                Agregar elemento
+        </button>
+
+        <button class="btn btn-primary mb-2" data-bs-toggle="modal" data-bs-target="#modalEntrada">Ingreso</button>
+        <button class="btn btn-danger mb-2" data-bs-toggle="modal" data-bs-target="#modalSalida">Salida</button>
       </div>
     </div>
   `;
@@ -93,9 +100,6 @@ function showMessage(html) {
     if (!resultContainer) return;
     resultContainer.innerHTML = html;
 }
-
-
-
 
 if (!formBuscarPersona) console.error("No se encontró #formBusarPersona");
 else {
@@ -150,16 +154,15 @@ else {
     });
 }
 
-
 //Estado del prestamo
 
-    let ingresoElementos = fetch(`${APIPERSONAS}ingresosElementos`,{
-        headers:{
-            Authorization:`Bearer ${token}`
-        }
-    })
+// let ingresoElementos = fetch(`${APIPERSONAS}ingresosElementos`,{
+//     headers:{
+//         Authorization:`Bearer ${token}`
+//     }
+// })
 
-    .then(response => response.json())
-    .then(data => {
-        console.log(data)
-    })
+// .then(response => response.json())
+// .then(data => {
+//     console.log(data)
+// })

@@ -42,11 +42,11 @@
         </div>
     </main>
 
+
     <!--Informacion Usuario-->
-
     <div class="container alaing-items-center" id="resultContainer"></div>
-
     <div class="container alaing-items-center" id="resultItems"></div>
+
 
     <!-- Modal Crear/Editar -->
     <div class="modal fade" id="modalElemento" tabindex="-1" aria-hidden="true">
@@ -81,6 +81,81 @@
                     <select id="dropdownTipo" class="form-select">
                         <option value="">-- Selecciona un tipo --</option>
                     </select>
+
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardarItem">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!--Modal registrar entrada-->
+    <div class="modal fade" id="modalEntrada" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">
+                        Registrar Entrada
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">fecha y hora</label>
+                        <input class="form-control" type="datetime-local" id="fechaHoraEntrada" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <input class="form-control" id="observacionEntrada" required>
+                    </div>
+                    <input type="hidden" id="idPersona">
+
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardarItem">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!--Modal registrar salida-->
+        <div class="modal fade" id="modalSalida" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitleSalida">
+                        Registrar Salida
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">fecha y hora</label>
+                        <input class="form-control" type="datetime-local" id="fechaHoraSalida" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <input class="form-control" id="observacionSalida" required>
+                    </div>
+                    <input type="hidden" id="idIngreso">
 
                     <div id="alert-el" class="alert alert-danger d-none">
                     </div>
