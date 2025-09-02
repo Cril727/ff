@@ -19,7 +19,7 @@ btnLogout.addEventListener("click", async() => {
         alert(error)
     }finally{
         localStorage.removeItem("token");
-        window.location = "./index.html"
+        window.location = "index.html" ? window.location = "../index.html" : "./index.html";
     }
 
     if(res.ok){

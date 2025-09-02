@@ -531,6 +531,7 @@ namespace App\Http\Controllers;
 
 use App\Models\ingresoElementos;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Redis;
 use Illuminate\Support\Facades\Validator;
 
 class IngresoElementosController extends Controller
@@ -566,6 +567,24 @@ class IngresoElementosController extends Controller
         ]);
 
         return response()->json(['success' => true, 'message' => 'Elemento ingresado Correctamente', 'ingreso elemento' => $ingresoElemento]);
+    }
+
+
+    public function update(Request $request, string $idIngresoElemento){
+        $ingresoElemento = ingresoElementos::find($idIngresoElemento);
+
+        $validator = Validator::make($request->all(),[
+            'idIngreso' => 'required|exists:ingresos,idIngreso',
+            'idElemento' => 'required|exists:elementos,idElemento',
+            'estado' => 'required|string'
+        ]);
+
+        if($validator->fails()){
+            return response()->json(['errors' => $validator->errors()]);
+        }
+
+        $ingresoElemento->update($validator->validated());
+        return response()->json(["Success" => true, "Message" => "Actualizado Correctamente" , $ingresoElemento], 200);
     }
 }
 
@@ -625,8 +644,11 @@ class PersonasController extends Controller
     {
 
         $persona = personas::where('documento', $documento)
-                    ->with('elementos.tipo')
-                    ->first();
+            ->with([
+                'elementos.tipo',
+                'elementos.ultimoIngresoElemento',
+                'roles'
+            ])->first();
 
         if (!$persona) {
             return response()->json(['success' => false, 'error' => 'persona no encontrada'], 404);
@@ -872,9 +894,15 @@ class elementos extends Model
         return $this->belongsTo(personas::class, 'idPersona', 'idPersona');
     }
 
-    public function ingresoElemento(){
-        return $this->hasMany(ingresoElementos::class, 'idIngresoElemento', 'idIngresoElemento');
-    } 
+        public function ingresoElementos()
+    {
+        return $this->hasMany(ingresoElementos::class, 'idElemento', 'idElemento');
+    }
+
+    public function ultimoIngresoElemento()
+    {
+        return $this->hasOne(ingresoElementos::class, 'idElemento', 'idElemento')->latestOfMany('idIngresoElemento');
+    }
 }
 
 
@@ -1076,6 +1104,8 @@ class rolPersonas extends Model
     public function personas(){
         return $this->belongsTo(personas::class, 'idPersona', 'idPersona');
     }
+
+
 
 
 }
@@ -3707,6 +3737,7 @@ Route::middleware('auth:api')->group(function(){
     Route::post('/salida',[SalidasController::class, 'store'])->middleware('role:admin');
     Route::get('/ingresosElementos', [IngresoElementosController::class, 'index'])->middleware('role:admin');
     Route::get('/listarTipos',[TiposController::class, 'index'])->middleware('role:admin');
+    Route::put('/actualizarIngresoElementos/{idIngresoElemento}',[IngresoElementosController::class, 'update'])->middleware('role:admin');
 });
 
 
@@ -3800,4 +3831,632 @@ class ExampleTest extends TestCase
     }
 }
 
+
+================================================
+FILE: public/app.html
+================================================
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>App – Elementos</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+
+<body class="bg-light">
+    <nav class="navbar navbar-light bg-white border-bottom px-3">
+        <span class="navbar-brand mb-0 h1">Entradas y Salidas</span>
+
+        <div>
+            <a href="./views/items.html" class="btn btn-primary mx-4">Items</a>
+        </div>
+
+        <div>
+            <a href="./views/users.html" class="btn btn-primary">Usuarios</a>
+        </div>
+
+        <div class="ms-auto">
+            <button id="btn-logout" class="btn btn-outline-danger btn-sm">
+                Cerrar sesión
+            </button>
+        </div>
+    </nav>
+
+    <main class="container py-4">
+        <div class="card mb-3">
+            <div class="card-body">
+                <form action="" id="formBusarPersona" method="post">
+                    <label for="" class="justify-content-center">Documento</label><br>
+                    <input type="number" id="txtBuscarPersona" class="form-control form-control-lg"><br>
+
+                    <button type="submit" id="btnBusacar" onclick="tipos()" class="btn btn-success">
+                        Buscar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+
+    <!--Informacion Usuario-->
+    <div class="container alaing-items-center" id="resultContainer"></div>
+    <div class="container alaing-items-center" id="resultItems"></div>
+
+
+    <!-- Modal Crear/Editar -->
+    <div class="modal fade" id="modalElemento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">
+                        Nuevo elemento
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="idElemento">
+                    <div class="mb-3">
+                        <label class="form-label">Código</label>
+                        <input class="form-control" id="codigo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" id="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Características</label>
+                        <textarea class="form-control" id="caracteristicas" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">foto</label>
+                        <textarea class="form-control" id="foto" rows="2" type="img"></textarea>
+                    </div>
+
+                    <select id="dropdownTipo" class="form-select">
+                        <option value="">-- Selecciona un tipo --</option>
+                    </select>
+
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardarItem">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!--Modal registrar entrada-->
+    <div class="modal fade" id="modalEntrada" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">
+                        Registrar Entrada
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">fecha y hora</label>
+                        <input class="form-control" type="datetime-local" id="fechaHoraEntrada" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <input class="form-control" id="observacionEntrada" required>
+                    </div>
+                    <input type="hidden" id="idPersona">
+
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardarItem">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!--Modal registrar salida-->
+        <div class="modal fade" id="modalSalida" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitleSalida">
+                        Registrar Salida
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">fecha y hora</label>
+                        <input class="form-control" type="datetime-local" id="fechaHoraSalida" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Observaciones</label>
+                        <input class="form-control" id="observacionSalida" required>
+                    </div>
+                    <input type="hidden" id="idIngreso">
+
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardarItem">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts en orden -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="./js/api.js"></script>
+    <script src="./js/guard.js"></script>
+    <script src="./js/logout.js"></script>
+    <script src="./js/personas.js"></script>
+    <script src="./js/tipos.js"></script>
+    <script src="./js/elementos.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+</body>
+
+</html>
+
+
+================================================
+FILE: public/index.html
+================================================
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Login</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body{min-height:100vh;display:grid;place-items:center;background:#f6f7fb}
+    .card{max-width:420px;width:100%;border:0;box-shadow:0 10px 30px rgba(0,0,0,.06)}
+  </style>
+</head>
+<body>
+  <div class="card p-4">
+    <div class="card-body">
+      <h1 class="h4 mb-3 text-center">Iniciar sesión</h1>
+      <div id="alert" class="alert alert-danger d-none" role="alert"></div>
+
+      <form id="form-login" novalidate>
+        <div class="mb-3">
+          <label for="email" class="form-label">Correo</label>
+          <input type="email" class="form-control" id="email" required autocomplete="username">
+          <div class="invalid-feedback">Ingresa un correo válido.</div>
+        </div>
+        <div class="mb-3">
+          <label for="password" class="form-label">Contraseña</label>
+          <input type="password" class="form-control" id="password" required autocomplete="current-password">
+          <div class="invalid-feedback">La contraseña es obligatoria.</div>
+        </div>
+        <button id="btn-login" class="btn btn-success w-100" type="submit">Iniciar sesión</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Orden de scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="./js/api.js"></script>
+  <script src="./js/login.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" defer></script>
+</body>
+</html>
+
+
+
+================================================
+FILE: public/js/api.js
+================================================
+// === js/api.js ===
+const API = "http://127.0.0.1:8000/api"; // ajusta a tu host/LAN
+
+const tokenKey = "token";
+const getToken  = () => localStorage.getItem(tokenKey);
+const setToken  = (t) => localStorage.setItem(tokenKey, t);
+const clearToken= () => localStorage.removeItem(tokenKey);
+
+const api = axios.create({ baseURL: API, timeout: 10000 });
+
+// Adjunta Authorization en cada request
+api.interceptors.request.use((cfg) => {
+  const t = getToken();
+  if (t) cfg.headers.Authorization = `Bearer ${t}`;
+  return cfg;
+});
+
+// Manejo simple de 401: limpia y manda a login
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    if (err.response?.status === 401) {
+      clearToken();
+      if (!location.pathname.endsWith("index.html")) location.href = "./index.html";
+    }
+    return Promise.reject(err);
+  }
+);
+
+
+
+
+================================================
+FILE: public/js/elementos.js
+================================================
+//Ingreso elementos 
+
+
+
+
+
+================================================
+FILE: public/js/guard.js
+================================================
+// === js/guard.js ===
+(function () {
+  const hasToken = !!localStorage.getItem("token");
+  if (!hasToken) location.href = "./index.html";
+})();
+
+
+
+
+================================================
+FILE: public/js/login.js
+================================================
+// === js/login.js ===
+document.addEventListener("DOMContentLoaded", () => {
+    const form = document.getElementById("form-login");
+    const alertBox = document.getElementById("alert");
+    const btn = document.getElementById("btn-login");
+
+    form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        if (!form.checkValidity()) {
+            form.classList.add("was-validated");
+            return;
+        }
+
+        btn.disabled = true;
+        btn.textContent = "Ingresando...";
+        alertBox.classList.add("d-none");
+        alertBox.textContent = "";
+
+        try {
+            const { data } = await api.post("/login", {
+                email: document.getElementById("email").value.trim(),
+                password: document.getElementById("password").value,
+            });
+            localStorage.setItem("token", data.token);
+            location.href = "./app.html";
+        } catch (err) {
+            alertBox.textContent = err?.response?.data?.message ||
+                "Login inválido";
+            alertBox.classList.remove("d-none");
+        } finally {
+            btn.disabled = false;
+            btn.textContent = "Iniciar sesión";
+        }
+    });
+});
+
+
+
+================================================
+FILE: public/js/logout.js
+================================================
+let APILOGOUT = "http://127.0.0.1:8000/api/logout";
+
+let btnLogout = document.getElementById("btn-logout");
+
+btnLogout.addEventListener("click", async() => {
+    const token = localStorage.getItem("token");
+
+    try {
+        if(token){
+        const res = await fetch(APILOGOUT,{
+        method:"POST",
+        headers: {
+            Authorization: `Bearer ${token}`,
+            "Accept": "application/json"
+          }
+    });
+    }
+    } catch (error) {
+        alert(error)
+    }finally{
+        localStorage.removeItem("token");
+        window.location = "./index.html"
+    }
+
+    if(res.ok){
+        alert("sesiom cerrada")
+    }else{
+        alert("error")
+    }
+});
+
+
+
+================================================
+FILE: public/js/personas.js
+================================================
+// personas.js — versión simple
+const APIPERSONAS = "http://127.0.0.1:8000/api/";
+const token = localStorage.getItem("token");
+
+const documentoInput = document.getElementById("txtBuscarPersona");
+const formBuscarPersona = document.getElementById("formBusarPersona");
+const resultContainer = document.getElementById("resultContainer");
+const resultItems = document.getElementById("resultItems");
+
+function clearResults() {
+    if (resultContainer) resultContainer.innerHTML = "";
+}
+
+function cardItems(person = {}) {
+    if (!resultItems) return;
+
+    const elementosArr = Array.isArray(person.elementos)
+        ? person.elementos
+        : (person.elementos ? [person.elementos] : []);
+
+    if (elementosArr.length === 0) {
+        resultItems.innerHTML =
+            `<div class="alert alert-secondary">No hay items para esta persona.</div>`;
+        return;
+    }
+
+    let html = `<div class="container"><h1>Items del usuario</h1></div>`;
+
+    // agrega una tarjeta por cada elemento
+    elementosArr.forEach((elemento) => {
+        const codigo = elemento.codigo || "***";
+        const nombre = elemento.nombre || "***";
+        const caracteristicas = elemento.caracteristicas || "***";
+        const fotoUrl = elemento.foto;
+        const tipo = elemento.tipo.tipo;
+
+        // extrae estado de forma segura
+        const estadoObj = elemento.ultimo_ingreso_elemento;
+        const estado = estadoObj ? estadoObj.estado : null;
+
+
+        if (estado === "activo") {
+            botonEntradaSalida =
+                '<button class="btn btn-primary mb-3">Registrar Salida</button>';
+        } else {
+            botonEntradaSalida =
+                '<button class="btn btn-success mb-3">Registrar Entrada</button>';
+        }
+
+
+        html += `
+      <div class="card mb-3" style="max-width:540px">
+        <div class="card-body">
+          <h5 class="card-title mb-1">${nombre}</h5>
+          <p class="card-text mb-1"><small class="text-muted">Codigo: ${codigo}</small></p>
+          <p class="card-text mb-1">Caracteristicas: ${caracteristicas}</p>
+          <p class="card-text mb-1">Tipo: ${tipo}</p>
+          <p class="card-text mb-1">Estado: ${estado}</p>
+          <img src="${fotoUrl}" alt="${nombre}" class="img-fluid" style="width: 80px; height: 90px;">
+          <div>${botonEntradaSalida}</div>
+          <button class="btn btn-warning mb-3">Editar</button>
+          
+        </div>
+      </div>
+    `;
+    });
+
+    resultItems.innerHTML = html;
+}
+
+
+function renderCard(person = {}) {
+    if (!resultContainer) return;
+    const nombre =
+        ((person.nombres || person.nombre) + " " + (person.apellidos || ""))
+            .trim() || "Sin nombre";
+    const documento = person.documento || person.numero_documento || "—";
+    const email = person.email || "—";
+    const telefono = person.telefono || "—";
+
+    resultContainer.innerHTML = `
+    <div class="card mb-3" style="max-width:540px">
+      <div class="card-body">
+        <h5 class="card-title mb-1">${nombre}</h5>
+        <p class="card-text mb-1"><small class="text-muted">Documento: ${documento}</small></p>
+        <p class="card-text mb-1">Email: ${email}</p>
+        <p class="card-text">Tel: ${telefono}</p>
+        <button class="btn btn-success mb-2" data-bs-toggle="modal" data-bs-target="#modalElemento" id="btn-nuevo">
+                Agregar elemento
+        </button>
+
+        <button class="btn btn-primary mb-2" data-bs-toggle="modal" data-bs-target="#modalEntrada">Ingreso</button>
+        <button class="btn btn-danger mb-2" data-bs-toggle="modal" data-bs-target="#modalSalida">Salida</button>
+      </div>
+    </div>
+  `;
+}
+
+function showMessage(html) {
+    if (!resultContainer) return;
+    resultContainer.innerHTML = html;
+}
+
+if (!formBuscarPersona) console.error("No se encontró #formBusarPersona");
+else {
+    formBuscarPersona.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        clearResults();
+
+        const documento = documentoInput.value.trim();
+        if (!documento) return alert("Ingrese un documento");
+        if (!token) return alert("No hay token. Inicie sesión.");
+
+        try {
+            const res = await fetch(
+                `${APIPERSONAS}personaPorDocumento/${
+                    encodeURIComponent(documento)
+                }`,
+                {
+                    method: "GET",
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        "Content-Type": "application/json",
+                    },
+                },
+            );
+
+            if (!res.ok) {
+                const txt = await res.text();
+                return showMessage(
+                    `<div class="alert alert-warning">No se encontró la persona.</div>`,
+                );
+            }
+
+            const data = await res.json();
+            console.log(data);
+
+            const person = data.persona !== undefined ? data.persona : data;
+            console.log("person:", person);
+            if (!person) {
+                showMessage(
+                    `<div class="alert alert-warning">No se encontró la persona.</div>`,
+                );
+            } else {
+                renderCard(person);
+                cardItems(person);
+            }
+        } catch (err) {
+            console.error(err);
+            showMessage(
+                `<div class="alert alert-danger">Ocurrió un error. Revisa la consola.</div>`,
+            );
+        }
+    });
+}
+
+//Estado del prestamo
+
+// let ingresoElementos = fetch(`${APIPERSONAS}ingresosElementos`,{
+//     headers:{
+//         Authorization:`Bearer ${token}`
+//     }
+// })
+
+// .then(response => response.json())
+// .then(data => {
+//     console.log(data)
+// })
+
+
+
+================================================
+FILE: public/js/tipos.js
+================================================
+function tipos() {
+  const select = document.getElementById('dropdownTipo');
+  const TIPOSURL = "http://127.0.0.1:8000/api/";
+  const token = localStorage.getItem("token");
+
+  fetch(`${TIPOSURL}listarTipos`, {
+    headers: { Authorization: `Bearer ${token}` }
+  })
+  .then(r => r.json())
+  .then(data => {
+    const tipos = data.tipos ?? data;
+    select.innerHTML = '<option value="">-- Selecciona un tipo --</option>';
+    if (!tipos || tipos.length === 0) {
+      select.innerHTML += '<option value="">(no hay tipos)</option>';
+      return;
+    }
+    tipos.forEach(t => {
+      const id = t.idTipo ?? t.id;
+      const nombre = t.tipo ?? t.nombre;
+      select.innerHTML += `<option value="${id}">${nombre}</option>`;
+    });
+  })
+  .catch(e => {
+    console.error(e);
+    select.innerHTML = '<option value="">Error al cargar</option>';
+  });
+}
+
+
+
+================================================
+FILE: public/views/items.html
+================================================
+    <!-- Modal Crear/Editar -->
+    <div class="modal fade" id="modalElemento" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <form class="modal-content" id="form-elemento">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle">
+                        Nuevo elemento
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar">
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="idElemento">
+                    <div class="mb-3">
+                        <label class="form-label">Código</label>
+                        <input class="form-control" id="codigo" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Nombre</label>
+                        <input class="form-control" id="nombre" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Características</label>
+                        <textarea class="form-control" id="caracteristicas" rows="2"></textarea>
+                    </div>
+                    <div id="alert-el" class="alert alert-danger d-none">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">
+                        Cancelar
+                    </button>
+                    <button class="btn btn-success" type="submit" id="btn-guardar">
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+================================================
+FILE: public/views/users.html
+================================================
+[Empty file]
 
